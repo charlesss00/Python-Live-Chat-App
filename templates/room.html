@@ -1,0 +1,504 @@
+{% extends 'base.html' %} {% block content %}
+<div class="chat-container">
+  <div class="chat-header">
+    <h2>Chat Room: <span class="room-code">{{code}}</span></h2>
+    <div class="online-status">
+      <span class="status-dot"></span>
+      <span class="status-text">Online</span>
+    </div>
+  </div>
+  
+  <div class="messages-container">
+    <div class="messages" id="messages"></div>
+  </div>
+
+  <div class="input-container">
+    <div class="message-input-wrapper">
+      <input
+        type="text"
+        placeholder="Type your message..."
+        name="message"
+        id="message"
+        autocomplete="off"
+      />
+      <div class="input-actions">
+        <button type="button" class="emoji-btn" onclick="toggleEmojiPicker()">
+          <i class="fas fa-smile"></i>
+        </button>
+        <button type="button" id="send-btn" class="send-btn" onClick="sendMessage()">
+          <i class="fas fa-paper-plane"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://kit.fontawesome.com/your-font-awesome-kit.js"></script>
+<script type="text/javascript">
+  var socketio = io();
+  const messages = document.getElementById("messages");
+  let isTyping = false;
+  let typingTimeout;
+  let messageCount = 0;
+
+  const createMessage = (name, msg) => {
+    messageCount++;
+    const msgId = `msg-${messageCount}`;
+    const content = `
+      <div class="message" id="${msgId}">
+        <div class="message-content">
+          <div class="message-header">
+            <strong>${name}</strong>
+            <div class="message-actions">
+              <button onclick="editMessage('${msgId}')" class="btn-action">
+                Edit
+              </button>
+              <button onclick="deleteMessage('${msgId}')" class="btn-action">
+                Delete
+              </button>
+              <button onclick="toggleReactions('${msgId}')" class="btn-action">
+                React
+              </button>
+            </div>
+          </div>
+          <div class="message-body">
+            <p class="message-text">${msg}</p>
+            <span class="message-time">${new Date().toLocaleTimeString()}</span>
+          </div>
+        </div>
+        <div class="reactions-container" id="reactions-${msgId}"></div>
+      </div>
+    `;
+    messages.insertAdjacentHTML('beforeend', content);
+    messages.scrollTop = messages.scrollHeight;
+  };
+
+  function editMessage(msgId) {
+    const messageDiv = document.getElementById(msgId);
+    const textElement = messageDiv.querySelector('.message-text');
+    const currentText = textElement.textContent;
+    
+    const editForm = `
+      <div class="edit-form">
+        <input type="text" class="edit-input" value="${currentText}">
+        <div class="edit-actions">
+          <button onclick="saveEdit('${msgId}')" class="btn-save">Save</button>
+          <button onclick="cancelEdit('${msgId}')" class="btn-cancel">Cancel</button>
+        </div>
+      </div>
+    `;
+    
+    textElement.style.display = 'none';
+    textElement.insertAdjacentHTML('afterend', editForm);
+  }
+
+  function saveEdit(msgId) {
+    const messageDiv = document.getElementById(msgId);
+    const editInput = messageDiv.querySelector('.edit-input');
+    const textElement = messageDiv.querySelector('.message-text');
+    const newText = editInput.value.trim();
+    
+    if (newText) {
+      textElement.textContent = newText;
+      textElement.innerHTML += ' <span class="edited-tag">(edited)</span>';
+      textElement.style.display = 'block';
+      messageDiv.querySelector('.edit-form').remove();
+    }
+  }
+
+  function cancelEdit(msgId) {
+    const messageDiv = document.getElementById(msgId);
+    const textElement = messageDiv.querySelector('.message-text');
+    textElement.style.display = 'block';
+    messageDiv.querySelector('.edit-form').remove();
+  }
+
+  function deleteMessage(msgId) {
+    if (confirm('Are you sure you want to delete this message?')) {
+      const messageDiv = document.getElementById(msgId);
+      messageDiv.classList.add('fade-out');
+      setTimeout(() => messageDiv.remove(), 300);
+    }
+  }
+
+  function toggleReactions(msgId) {
+    const reactionsContainer = document.getElementById(`reactions-${msgId}`);
+    const existingChoices = reactionsContainer.querySelector('.reaction-choices');
+    
+    if (existingChoices) {
+      existingChoices.remove();
+      return;
+    }
+
+    const reactions = ['👍', '❤️', '😊', '😂', '👏', '🎉'];
+    const reactionChoices = document.createElement('div');
+    reactionChoices.className = 'reaction-choices';
+    
+    const reactionButtons = reactions.map(emoji => 
+      `<button class="reaction-btn" onclick="addReaction('${msgId}', '${emoji}')">${emoji}</button>`
+    ).join('');
+    
+    reactionChoices.innerHTML = reactionButtons;
+    reactionsContainer.appendChild(reactionChoices);
+  }
+
+  function addReaction(msgId, emoji) {
+    const reactionsContainer = document.getElementById(`reactions-${msgId}`);
+    const reactionId = `reaction-${msgId}-${emoji}`;
+    let reactionElement = document.getElementById(reactionId);
+    
+    if (reactionElement) {
+      const count = parseInt(reactionElement.dataset.count) + 1;
+      reactionElement.dataset.count = count;
+      reactionElement.textContent = `${emoji} ${count}`;
+    } else {
+      const newReaction = `
+        <span id="${reactionId}" class="reaction-count" data-count="1">
+          ${emoji} 1
+        </span>
+      `;
+      reactionsContainer.insertAdjacentHTML('beforeend', newReaction);
+    }
+
+    // Hide the reaction choices after selecting
+    const reactionChoices = reactionsContainer.querySelector('.reaction-choices');
+    if (reactionChoices) {
+      reactionChoices.remove();
+    }
+  }
+
+  // Handle typing indicator
+  const messageInput = document.getElementById('message');
+  messageInput.addEventListener('input', () => {
+    if (!isTyping) {
+      isTyping = true;
+      socketio.emit('typing', { isTyping: true });
+    }
+    
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+      isTyping = false;
+      socketio.emit('typing', { isTyping: false });
+    }, 1000);
+  });
+
+  socketio.on("message", (data) => {
+    createMessage(data.name, data.message);
+  });
+
+  const sendMessage = () => {
+    const message = document.getElementById("message");
+    if (message.value.trim() === "") return;
+    socketio.emit("message", { data: message.value });
+    message.value = "";
+    
+    // Clear typing indicator
+    isTyping = false;
+    socketio.emit('typing', { isTyping: false });
+  };
+
+  // Handle Enter key
+  messageInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+</script>
+
+<style>
+  .chat-container {
+    max-width: 1000px;
+    margin: 2rem auto;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    height: 80vh;
+  }
+
+  .chat-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    border-radius: 12px 12px 0 0;
+    color: white;
+  }
+
+  .room-code {
+    font-weight: 300;
+    opacity: 0.9;
+  }
+
+  .online-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    background: #22c55e;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.2); opacity: 0.7; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .messages-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+    background: #f8fafc;
+  }
+
+  .message {
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .message-content {
+    position: relative;
+  }
+
+  .message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .message-time {
+    font-size: 0.8rem;
+    color: #6c757d;
+  }
+
+  .message-body {
+    position: relative;
+  }
+
+  .message-text {
+    margin-right: 60px;
+    line-height: 1.4;
+  }
+
+  .message-actions {
+    position: absolute;
+    right: 0;
+    top: 0;
+    display: none;
+  }
+
+  .message:hover .message-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .btn-action {
+    padding: 0.25rem 0.5rem;
+    border: none;
+    background: none;
+    color: #6c757d;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s;
+  }
+
+  .btn-action:hover {
+    background: #e9ecef;
+    color: #000;
+  }
+
+  .edit-form {
+    margin-top: 0.5rem;
+  }
+
+  .edit-input {
+    width: calc(100% - 120px);
+    padding: 0.5rem;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    margin-right: 0.5rem;
+  }
+
+  .edit-actions {
+    display: inline-block;
+  }
+
+  .btn-save, .btn-cancel {
+    padding: 0.25rem 0.5rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-left: 0.25rem;
+  }
+
+  .btn-save {
+    background: #28a745;
+    color: white;
+  }
+
+  .btn-save:hover {
+    background: #218838;
+  }
+
+  .btn-cancel {
+    background: #dc3545;
+    color: white;
+  }
+
+  .btn-cancel:hover {
+    background: #c82333;
+  }
+
+  .edited-tag {
+    font-size: 0.8rem;
+    color: #6c757d;
+    font-style: italic;
+  }
+
+  .reactions-container {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .reaction-choices {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    background: #f8f9fa;
+    padding: 4px;
+    border-radius: 4px;
+    margin-top: 4px;
+  }
+
+  .reaction-btn {
+    padding: 4px 8px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: transform 0.2s;
+    font-size: 16px;
+  }
+
+  .reaction-btn:hover {
+    transform: scale(1.1);
+    background: #e9ecef;
+  }
+
+  .reaction-count {
+    padding: 4px 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    margin-right: 4px;
+    font-size: 14px;
+    cursor: default;
+  }
+
+  .input-container {
+    padding: 1.5rem;
+    background: white;
+    border-top: 1px solid #eee;
+    border-radius: 0 0 12px 12px;
+  }
+
+  .message-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 0.5rem;
+    transition: all 0.2s ease;
+  }
+
+  .message-input-wrapper:focus-within {
+    box-shadow: 0 0 0 2px #6366f1;
+  }
+
+  #message {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 0.5rem;
+    font-size: 1rem;
+    outline: none;
+  }
+
+  .input-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .emoji-btn, .send-btn {
+    padding: 0.5rem;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+  }
+
+  .emoji-btn:hover, .send-btn:hover {
+    color: #6366f1;
+    background: rgba(99,102,241,0.1);
+  }
+
+  .send-btn {
+    color: #6366f1;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .fade-out {
+    animation: fadeOut 0.3s ease forwards;
+  }
+
+  @keyframes fadeOut {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(10px); }
+  }
+
+  /* Scrollbar styling */
+  .messages-container::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .messages-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+  }
+
+  .messages-container::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 3px;
+  }
+
+  .messages-container::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+</style>
+
+{% for msg in messages %}
+<script type="text/javascript">
+  createMessage("{{msg.name}}", "{{msg.message}}");
+</script>
+{% endfor %} {% endblock %}

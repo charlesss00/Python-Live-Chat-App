@@ -1,0 +1,304 @@
+{% extends 'base.html' %} {% block content %}
+<div class="home-container">
+  <div class="welcome-section">
+    <h1 class="welcome-title">Welcome to Chat App</h1>
+    <p class="welcome-text">Connect with others in real-time chat rooms</p>
+  </div>
+
+  <div class="form-card">
+    <form method="post" class="join-form">
+      <div class="form-header">
+        <h2>Enter Chat Room</h2>
+        <p class="form-subtitle">Join an existing room or create a new one</p>
+      </div>
+
+      <div class="form-group">
+        <label for="name">
+          <i class="fas fa-user"></i>
+          <span>Your Name</span>
+        </label>
+        <input
+          type="text"
+          id="name"
+          placeholder="Enter your name"
+          name="name"
+          value="{{name}}"
+          required
+          autocomplete="off"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="code">
+          <i class="fas fa-hashtag"></i>
+          <span>Room Code</span>
+        </label>
+        <div class="room-code-input">
+          <input
+            type="text"
+            id="code"
+            placeholder="Enter room code"
+            name="code"
+            value="{{code}}"
+            autocomplete="off"
+          />
+          <button type="submit" name="join" class="join-btn">
+            <i class="fas fa-sign-in-alt"></i>
+            Join Room
+          </button>
+        </div>
+      </div>
+
+      <div class="divider">
+        <span>OR</span>
+      </div>
+
+      <button type="submit" name="create" class="create-btn">
+        <i class="fas fa-plus-circle"></i>
+        Create New Room
+      </button>
+
+      {% if error %}
+      <div class="error-message">
+        <i class="fas fa-exclamation-circle"></i>
+        <span>{{error}}</span>
+      </div>
+      {% endif %}
+    </form>
+  </div>
+
+  <div class="features-section">
+    <div class="feature-card">
+      <i class="fas fa-bolt"></i>
+      <h3>Real-time Chat</h3>
+      <p>Instant message delivery with real-time updates</p>
+    </div>
+    <div class="feature-card">
+      <i class="fas fa-lock"></i>
+      <h3>Private Rooms</h3>
+      <p>Create private chat rooms with unique codes</p>
+    </div>
+    <div class="feature-card">
+      <i class="fas fa-paint-brush"></i>
+      <h3>Custom Themes</h3>
+      <p>Switch between light and dark modes</p>
+    </div>
+  </div>
+</div>
+
+<style>
+  .home-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+
+  .welcome-section {
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+
+  .welcome-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 1rem;
+  }
+
+  .welcome-text {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+  }
+
+  .form-card {
+    background: var(--background-light);
+    border-radius: 1rem;
+    box-shadow: var(--shadow-lg);
+    max-width: 500px;
+    margin: 0 auto 3rem;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+  }
+
+  .join-form {
+    padding: 2rem;
+  }
+
+  .form-header {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .form-header h2 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .form-subtitle {
+    color: var(--text-secondary);
+  }
+
+  .form-group {
+    margin-bottom: 1.5rem;
+  }
+
+  .form-group label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+  }
+
+  .form-group input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    background: var(--background-dark);
+    color: var(--text-primary);
+    font-size: 1rem;
+    transition: all 0.2s ease;
+  }
+
+  .form-group input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.1);
+    outline: none;
+  }
+
+  .room-code-input {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .join-btn {
+    padding: 0.75rem 1.5rem;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+  }
+
+  .join-btn:hover {
+    background: var(--primary-dark);
+    transform: translateY(-1px);
+  }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 1.5rem 0;
+    color: var(--text-secondary);
+  }
+
+  .divider::before,
+  .divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .divider span {
+    padding: 0 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+
+  .create-btn {
+    width: 100%;
+    padding: 0.75rem;
+    background: var(--background-dark);
+    color: var(--primary-color);
+    border: 2px solid var(--primary-color);
+    border-radius: 0.5rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .create-btn:hover {
+    background: var(--primary-color);
+    color: white;
+  }
+
+  .error-message {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger-color);
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .features-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+    margin-top: 3rem;
+  }
+
+  .feature-card {
+    background: var(--background-light);
+    padding: 2rem;
+    border-radius: 1rem;
+    text-align: center;
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+  }
+
+  .feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .feature-card i {
+    font-size: 2rem;
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+  }
+
+  .feature-card h3 {
+    margin-bottom: 0.5rem;
+  }
+
+  .feature-card p {
+    color: var(--text-secondary);
+  }
+
+  @media (max-width: 768px) {
+    .home-container {
+      padding: 1rem;
+    }
+
+    .welcome-title {
+      font-size: 2rem;
+    }
+
+    .room-code-input {
+      flex-direction: column;
+    }
+
+    .join-btn {
+      width: 100%;
+    }
+  }
+</style>
+{% endblock %}
